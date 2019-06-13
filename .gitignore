@@ -1,8 +1,12 @@
-
 wt-lung_R1_001.fastq.gz
 wt-lung_R2_001.fastq.gz
 tre/
 old_lung_R1_001.fastq.gz
 old_lung_R2_001.fastq.gz
 aws-cli/
-.ipynb_checkpoints/sines-checkpoint.ipynb
+.ipynb_checkpoints/*.ipynb
+Kramerov_11_WIRR.pdf
+Vassetzky_03_G.pdf
+cardelli2018.pdf
+kramerov2011.pdf
+wt-lung_R1_001.CUT.fastq*
