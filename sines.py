@@ -3,14 +3,15 @@
 
 # In[1]:
 
-import pprint
+from pprint import pprint
 
 import gzip
 import tre
 import random
 import difflib
 import collections
-
+import fractions
+from fractions import Fraction
 
 # http://biopython.org/
 import Bio
@@ -38,8 +39,6 @@ def test1(lim):
                 return
 
 
-# In[3]:
-
 
 # DEPRECATED
 def closest_sub(long_str, short_str):
@@ -59,10 +58,6 @@ def closest_sub_exact(long_str, short_str):
         if (d < min_d):
             min_d = d
     return min_d        
-
-
-# In[3]:
-
 
 def cutoff(long_seq, x, max_dist):
     lx = len(x)
@@ -85,7 +80,8 @@ start_time = None
 #def iupac_notation_to_regexp(iupac_string):
 
 
-def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 30, step_print = 10000, nlines = 500000, sine_l = 80):
+def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 20, step_print = 10000, nlines = 500000, sine_l = 80):
+
     print ('override =',override)
     sine_set = []
     stats = collections.Counter()
@@ -156,6 +152,7 @@ def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 30, step_print = 1
             d = m.cost
             # Filter out strings that were cut out. Approximate by max-length matches
             # 10 is arbitrary, not very small
+            
             if (m.groups()[0][1] < len(cur_seq) - 10) and (m.groups()[0][0] > 40):
                 # print(m.groups(), len(cur_seq))
                 cnt += 1      
@@ -188,49 +185,59 @@ def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 30, step_print = 1
 ##            print(k, detailed_stats[k])
 
 
-def search_sines2(sine_f, r1_f, to_check = {0,1,2}, step_print = 10000, nlines = 100000):
-
-    sine_set = []
-    stats = collections.Counter()
+def verify(frac, res):
+    pref_len = min(res[0], res[1])
+    return (frac >= 0.8) and (res[1] - pref_len > 20)
     
-    for (i,sine_record) in enumerate(SeqIO.parse(sine_f, "fasta")):
-        if (i in to_check):
-            cur_seq = Seq(str(sine_record.seq), IUPAC.IUPACAmbiguousDNA())
-            cur_seq_rc = cur_seq.reverse_complement()
-            sine_set.append(str(cur_seq))
-            sine_set.append(str(cur_seq_rc))
-            print(cur_seq, cur_seq_rc, '''\n ======================''')
 
-    for sine in sine_set:
-        matcher = difflib.SequenceMatcher(isjunk=None, a=sine) 
-        
-        total = 0
-        cnt = 0
-        start_time = time()
-        print('''sequences for sine = ''')
-                    
-        for cur_seq in r1_f:
-            total += 1
-            matcher.set_seq2(cur_seq)
-            res = matcher.find_longest_match(0, len(sine), 0, len(cur_seq))
-            d = res[2]
+def search_sines2(sine, r1_f, thresh = 8, pref = 60, step_print = 100000, nlines = 200000):
 
-            stats[d] += 1
-                            
-            if (total % step_print == 0 or total == nlines):
-                print('''distances for first''', total, '''segments \n''')
-                print('''========================''')
-                print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')
-                for k in sorted(stats):
-                    print('longest common =', k, 'num matches =', stats[k], '''/''',cnt)
+    global stats
+    stats = {}
+     
+    
+    sine = sine[:pref]
+    matcher = difflib.SequenceMatcher(isjunk=None, a=sine,b='',autojunk = False) 
+    
+    total = 0
+    start_time = time()
+    print('''sequences for sine = ''')
                 
+    for cur_seq in r1_f:
+        total += 1
+        matcher.set_seq2(cur_seq)
+        res = matcher.find_longest_match(0, len(sine), 0, len(cur_seq))
+        pref_len = min(res[0], res[1])
+        d = res[2]
+        comp_1 = sine[res[0] - pref_len: res[0] + d]
+        comp_2 = cur_seq[res[1] - pref_len: res[1] + d]          
+        d1 = distance(comp_1, comp_2)
+
+        stats.setdefault(d, [0, collections.Counter()])
+        stats[d][0] += 1
+        stats[d][1][Fraction(d1, pref_len + d)] += 1 
             
-            if (total == nlines):
-                break
+                        
+        if (total % step_print == 0 or total == nlines):
+            print('''distances for first''', total, '''segments \n''')
+            print('''========================''')
+            print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')
+            for k in sorted(stats):
+                print('longest common =', k, 'num matches =', len(stats[k][1]), '''/''',total)
+                if (total >= nlines) and (k >= thresh):
+                    n = 0
+                    for i in stats[k][1]:
+                        if verify(stats[k][1][i], res):
+                            n += 1
+                     #   else:
+                     #       if (stats[k][1][i] < 0.8):
+                     #           print ('Fraction = ',stats[k][1][i])
+                    print('number of >0.8 instances is',n)
+                    #    print ('fraction ',i,' appears ',stats[k][1][i],' times')
+            
+        if (total == nlines):
+            break
 
-
-
-# In[4]:
 
 
 '''|'''.join(['''foo''', '''bar''','''ooki'''])
@@ -250,6 +257,15 @@ def gz_strings(filename):
             if line[0] not in '''@+#''':  # skip fastq headers/quality
                 yield line
 
+def get_sines(sine_f):
+    for (i,sine_record) in enumerate(SeqIO.parse(sine_f, "fasta")):
+        cur_seq = Seq(str(sine_record.seq), IUPAC.IUPACAmbiguousDNA())
+        yield str(cur_seq)
+        cur_seq_rc = cur_seq.reverse_complement()
+        yield str(cur_seq_rc)
+        print(cur_seq, cur_seq_rc, '''\n ======================''')
+
+            
 
 print('''Here come the SINES!''')
 
@@ -289,8 +305,10 @@ def get_min_stats(bar_codes):
                 
 print('==============================================================================')
 
-search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), 0)
-get_min_stats(bar_codes)
+for sine in get_sines("B1.fasta"):
+    search_sines2(sine,fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''))
+
+#get_min_stats(bar_codes)
 
 #search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), 1)
 #search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), 2)
