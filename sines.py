@@ -169,11 +169,12 @@ def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 20, step_print = 1
             distances_from_combined_regexp[res] = d 
 
         if (total % step_print == 0 or total == nlines):
-            print('''distances for first''', total, '''segments \n''')
+            print('''stats for first''', total, '''segments \n''')
             print('''========================''')
             print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')
-            for k in sorted(stats):
-                print('edit distance =', k, 'matches =', stats[k], '''/''',cnt)
+            #for k in sorted(stats):
+            #    print('edit distance =', k, 'matches =', stats[k], '''/''',cnt)
+            pprint.pprint(collections.Counter(detailed_stats.values()))
         
         if (total == nlines):
             break
@@ -300,6 +301,7 @@ def get_min_stats(bar_codes):
     print('distance stats are ::::::::::::::::::::::: ')
     for k in sorted(distances):
         print('edit distance =', k, 'matches =', distances[k], '''/''',cnt)
+    
     print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')    
         
                 
@@ -308,6 +310,7 @@ print('=========================================================================
 for sine in get_sines("B1.fasta"):
     search_sines2(sine,fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''))
 
+#search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), step_print=500_000, nlines=10_000_000)
 #get_min_stats(bar_codes)
 
 #search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), 1)
