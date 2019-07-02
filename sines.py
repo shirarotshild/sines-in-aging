@@ -6,6 +6,7 @@
 from pprint import pprint
 
 import gzip
+import io
 import tre
 import random
 import difflib
@@ -260,18 +261,39 @@ def search_sines2(sine, r1_f, frac_bound, pref_bound, start_line = 0, step_print
 '''|'''.join(['''foo''', '''bar''','''ooki'''])
 
 
-
-
 def fastq_gz_strings(filename):
-    with gzip.open(filename, "rt") as handle:    
-        for r in SeqIO.parse(handle, "fastq"):
-            yield str(r.seq)
-             
+    with gzip.open(filename, "rt") as handle:
+        for record in SeqIO.parse(handle, "fastq"):
+            yield str(record.seq)
+
 def gz_strings(filename):
-    with gzip.open(filename, "rt") as handle:    
-        for line in handle:
-            if line[0] not in '''@+#''':  # skip fastq headers/quality
-                yield line
+    with gzip.open(filename, "rt") as text:    
+        for i, line in enumerate(text):
+            # records of 4 lines: @header, dna, +, quality
+            if i % 4 == 1:
+                yield line.rstrip()
+
+def fastq_zst_strings(filename):
+    # https://github.com/indygreg/python-zstandard - pip3 install zstandard
+    import zstandard as zstd
+    with open(filename, 'rb') as fastq_zst_handle:
+        fastq_handle = zstd.ZstdDecompressor().stream_reader(fastq_zst_handle)
+        # wrapper adds support for .readline(), for line in ...
+        fastq_text = io.TextIOWrapper(fastq_handle, encoding='ascii')
+        for record in SeqIO.parse(fastq_text, "fastq"):
+            yield str(record.seq)
+            
+def zst_strings(filename):
+    # https://github.com/indygreg/python-zstandard - pip3 install zstandard
+    import zstandard as zstd
+    with open(filename, 'rb') as fastq_zst_handle:
+        fastq_handle = zstd.ZstdDecompressor().stream_reader(fastq_zst_handle)
+        # wrapper adds support for .readline(), for line in ...
+        fastq_text = io.TextIOWrapper(fastq_handle, encoding='ascii')
+        for i, line in enumerate(fastq_text):
+            # records of 4 lines: @header, dna, +, quality
+            if i % 4 == 1:
+                yield line.rstrip()
 
 def get_sines(sine_f):
     for (i,sine_record) in enumerate(SeqIO.parse(sine_f, "fasta")):
