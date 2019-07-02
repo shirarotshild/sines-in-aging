@@ -80,7 +80,8 @@ start_time = None
 #def iupac_notation_to_regexp(iupac_string):
 
 
-def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 20, step_print = 10000, nlines = 500000, sine_l = 80):
+# standard use case: one sine at a time
+def search_sines(sines, r1_f, override = 0, upper_mut_dist = 20, step_print = 1000000, nlines = 100000000, sine_l = 70):
 
     print ('override =',override)
     sine_set = []
@@ -95,22 +96,13 @@ def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 20, step_print = 1
     global distances_from_combined_regexp
     distances_from_combined_regexp = {}
 
-    matcher = difflib.SequenceMatcher()
-    
-    for sine_record in SeqIO.parse(sine_f, "fasta"):
-        cur_seq = Seq(str(sine_record.seq)[:sine_l], IUPAC.IUPACAmbiguousDNA())
-        cur_seq_rc = cur_seq.reverse_complement()
-        sine_set.append(str(cur_seq))
-        sine_set.append(str(cur_seq_rc))
-        print(cur_seq, cur_seq_rc, '''\n ======================''')
-
-    complete_regexp = '''|'''.join(sine_set)
+    complete_regexp = '''|'''.join([sine[:sine_l] for sine in sines])
     p = tre.compile(complete_regexp, tre.EXTENDED)
 
     if override == 1:
         bases = ['A','C','G','T']
         ind_list = [random.randrange(4) for i in range(sine_l)]
-        r_sine = ''.join( [bases[ind_list[i]] for i in range(sine_l)] )
+        r_sine = ''.join( [bases[ipnd_list[i]] for i in range(sine_l)] )
         r_sine_rc = ''.join( [bases[3-ind_list[i]] for i in range(sine_l)] )
         sine_set = [r_sine, r_sine_rc]
         complete_regexp = '''|'''.join(sine_set)
@@ -143,108 +135,131 @@ def search_sines(sine_f, r1_f, override = 0, upper_mut_dist = 20, step_print = 1
     start_time = time()
     print('''sequences = ''')
 
-    bar_code_len = 60                         
+   # bar_code_len = 60                         
     for cur_seq in r1_f:
         total += 1
-        m = p.search(cur_seq, tre.Fuzzyness(maxerr = upper_mut_dist))
+        m = p.search(cur_seq, tre.Fuzzyness(maxerr = sine_l - 10))
         if m:
             res = m.group(0)
             d = m.cost
             # Filter out strings that were cut out. Approximate by max-length matches
             # 10 is arbitrary, not very small
+            # barcodes are not in place here
+
             
-            if (m.groups()[0][1] < len(cur_seq) - 10) and (m.groups()[0][0] > 40):
-                # print(m.groups(), len(cur_seq))
+            stats[d] += 1
+            bar_code_min_len = 23
+          #  if (m.groups()[0][1] < len(cur_seq) - 5) and (d <= upper_mut_dist):
+          
+            if (m.groups()[0][0] >= bar_code_min_len) and (d <= upper_mut_dist):
                 cnt += 1      
-                stats[d] += 1
+                detailed_stats[res] += 1
+                bar_code = cur_seq[m.groups()[0][0] - bar_code_min_len : m.groups()[0][0]]
+                
+                bar_codes.setdefault(bar_code, 0)
+                bar_codes[bar_code] +=  1
 
-                bar_code = cur_seq[m.groups()[0][0] - 40 : m.groups()[0][0]]
+            
+        #    distances_from_combined_regexp[res] = d 
 
-                if bar_code in bar_codes:
-                   bar_codes[bar_code] +=  1
-                else:
-                    bar_codes[bar_code] = 1
-
-            detailed_stats[res] += 1
-            distances_from_combined_regexp[res] = d 
-
-        if (total % step_print == 0 or total == nlines):
+        if (total % step_print == 0) or (total == nlines):
             print('''stats for first''', total, '''segments \n''')
             print('''========================''')
             print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')
-            #for k in sorted(stats):
-            #    print('edit distance =', k, 'matches =', stats[k], '''/''',cnt)
-            pprint.pprint(collections.Counter(detailed_stats.values()))
+            
+            for k in sorted(stats):
+                print('edit distance =', k, 'matches =', stats[k], '''/''',cnt)
+         #   pprint.pprint(collections.Counter(detailed_stats.values()))
         
         if (total == nlines):
-            break
-
-##    print('''returning with nlines =''', nlines)
-##    print('''detailed stats are''')    
-##      for k in sorted(detailed_stats):
-##       if detailed_stats[k][1] <= upper_mut_dist:
-##            print(k, detailed_stats[k])
+            return bar_codes
 
 
-def verify(frac, res):
+
+def verify(frac, res, f1 = 1, pref_bound = 20):
     pref_len = min(res[0], res[1])
-    return (frac >= 0.8) and (res[1] - pref_len > 20)
-    
+    return (frac <= f1) and (res[1] - pref_bound > 20)
+  
 
-def search_sines2(sine, r1_f, thresh = 8, pref = 60, step_print = 100000, nlines = 200000):
+def search_sines2(sine, r1_f, frac_bound, pref_bound, start_line = 0, step_print = 1000000, nlines = 200000000, thresh = 9, pref = 60):
 
     global stats
     stats = {}
      
-    
+    print('step ',step_print, nlines)
     sine = sine[:pref]
     matcher = difflib.SequenceMatcher(isjunk=None, a=sine,b='',autojunk = False) 
     
     total = 0
+    cnt = 0
     start_time = time()
-    print('''sequences for sine = ''')
+    print('''condidates for sine = ''')
+
+    if start_line > 0:
+        for (i,cur_seq) in enumerate(r1_f):
+            if i == start_line - 1:
+                break
+
                 
     for cur_seq in r1_f:
-        total += 1
-        matcher.set_seq2(cur_seq)
-        res = matcher.find_longest_match(0, len(sine), 0, len(cur_seq))
-        pref_len = min(res[0], res[1])
-        d = res[2]
-        comp_1 = sine[res[0] - pref_len: res[0] + d]
-        comp_2 = cur_seq[res[1] - pref_len: res[1] + d]          
-        d1 = distance(comp_1, comp_2)
-
-        stats.setdefault(d, [0, collections.Counter()])
-        stats[d][0] += 1
-        stats[d][1][Fraction(d1, pref_len + d)] += 1 
-            
-                        
+        
         if (total % step_print == 0 or total == nlines):
             print('''distances for first''', total, '''segments \n''')
             print('''========================''')
             print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')
             for k in sorted(stats):
-                print('longest common =', k, 'num matches =', len(stats[k][1]), '''/''',total)
+                n = sum([i for i in stats[k][1].values()])
+                print('longest common =', k, 'num matches =', n, stats[k][0], '''/''',cnt)
                 if (total >= nlines) and (k >= thresh):
-                    n = 0
-                    for i in stats[k][1]:
-                        if verify(stats[k][1][i], res):
-                            n += 1
-                     #   else:
-                     #       if (stats[k][1][i] < 0.8):
-                     #           print ('Fraction = ',stats[k][1][i])
-                    print('number of >0.8 instances is',n)
-                    #    print ('fraction ',i,' appears ',stats[k][1][i],' times')
-            
+                    for (i,frac) in enumerate(sorted(stats[k][1])):
+                        print (k,'Fraction = ',frac)
+                        if i == 20:
+                            break
+                        
         if (total == nlines):
             break
+        
+        total += 1
+        matcher.set_seq2(cur_seq)
+        res = matcher.find_longest_match(0, len(sine), 0, len(cur_seq))
+        com = res[2]
+
+        complete_regexp = sine[: res[0]] + '$'
+        p = tre.compile(complete_regexp, tre.EXTENDED)
+        max_fuzz = res[0] # int(frac_bound*res[0]) is better perhaps, but want to trivialize it for now
+        m = p.search(cur_seq[:res[1]], tre.Fuzzyness(maxcost = max_fuzz,
+                                                     delcost = int(1/4.0*max_fuzz)+1,
+                                                     inscost = int(1/4.0*max_fuzz)+1))
+        if m == None:
+            continue
+        
+        start_p = m.groups()[0][0]
+        d = m.cost
+            
+        # This is the fraction of edit distance out of all.
+        # In most cases, this is the right edit distance for the overall prefix
+
+        if (res[0] + com) == 0:
+            print('How peculier!','com =',com,'res[0] = ',res[0], m.cost)
+            continue
+        
+        frac = Fraction(d, res[0] + com)
+
+        stats.setdefault(com, [0, collections.Counter()])
+        stats[com][0] += 1
+
+        try:
+            if (start_p >= pref_bound) and Fraction(d, res[0]) <= frac_bound:
+                stats[com][1][frac] += 1
+                cnt += 1
+        except (ZeroDivisionError):
+            pass
 
 
 
 '''|'''.join(['''foo''', '''bar''','''ooki'''])
 
 
-# In[5]:
 
 
 def fastq_gz_strings(filename):
@@ -282,36 +297,95 @@ good_lines = [
 ]
 #search_sines("mouse SINEs.fasta",good_lines)
 
-
-def get_min_stats(bar_codes):
+def get_min_stats2(cur_stats, ok_inter = 23, good_inter = 11, good_d = 4, ok_d = 6):
+    # TODO Improve over the complexity here: Idea in mind works if there are only a few close ones for each string. 
     start_time = time()
-    distances = {}
-    for (i,g) in enumerate(bar_codes):
-        min = 40
-        for (j,h) in enumerate(bar_codes):
-            d = distance(g,h)
-            if (i != j) and (d < min):
-                min = d
-        if min in distances:
-            distances[min] += 1
-        else:
-            distances[min] = 1
+    global stats
+    stats = collections.Counter()
+    global good
+    good = {}
 
-    cnt = sum(distances[i] for i in distances)
-    print('distance stats are ::::::::::::::::::::::: ')
-    for k in sorted(distances):
-        print('edit distance =', k, 'matches =', distances[k], '''/''',cnt)
+    matcher = difflib.SequenceMatcher(isjunk=None, a='',b='',autojunk = False)
+
+    #note we actually do count to vector itself as being close to itself
+    tot = len(cur_stats)
+    for (i,g) in enumerate(cur_stats):      
+        if (cur_stats[g] > 1):
+            stats[len(g)] += 1
+        else:
+            max_intersection = (-1,0)
+            matcher.set_seq1(g)
+            for (j,h) in enumerate(cur_stats):
+                if i != j:
+                    matcher.set_seq2(h)
+                    res = matcher.find_longest_match(0, len(g), 0, len(h))
+                    com = res[2]
+                    if com > max_intersection[0]:
+                        max_intersection = (com, h)
+                        
+            if (max_intersection[0] <= ok_inter):
+                good.setdefault(max_intersection[0], [])
+                d = distance(g,max_intersection[1])
+                good[max_intersection[0]].append(distance(g,max_intersection[1]))
+       
+            stats[max_intersection[0]] += 1
+            
+        if (i % 1000 == 0) or (i >= tot - 1):
+            print(i)
+            cnt = i
+            print('counter stats are ::::::::::::::::::::::: ')
+            for j in sorted(stats):
+                print('intersection =', j, 'matches =', stats[j], '''/''',i)
+            
+            print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')
+
+    
+
+def get_min_stats(cur_stats, thresh = 6):
+    # TODO Improve over the complexity here: Idea in mind works if there are only a few close ones for each string. 
+    start_time = time()
+    counters = collections.Counter()
+    good = {}
+
+    #note we actually do count to vector itself as being close to itself                               
+    for (i,g) in enumerate(cur_stats):
+        if (i % 1000 == 0):
+            print(i)
+        g_stats = collections.Counter()
+        for (j,h) in enumerate(cur_stats):
+            d = distance(g,h)
+            g_stats[d] += cur_stats[h]
+
+        v = sum([g_stats[k] for k in sorted(g_stats) if k <= thresh])
+        if (v>0):
+           counters[v] += cur_stats[g]
+                               
+
+    cnt = sum(counters[i] for i in counters)
+    print('counter stats are ::::::::::::::::::::::: ')
+    for i in sorted(counters):
+        print('frequency =', i, 'matches =', counters[i], '''/''',cnt)
     
     print('''time elapsed''', (time() - start_time)/60.0, '''minutes''')    
         
-                
-print('==============================================================================')
 
-for sine in get_sines("B1.fasta"):
-    search_sines2(sine,fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''))
+def upper_level(frac = 0.25, pref_bound = 28, start_line = 0):                
+    print('==============================================================================')
 
+    #<<<<<<< Updated upstream
+    #for sine in get_sines("B1.fasta"):
+    #    search_sines2(sine,fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), frac, pref_bound, start_line)
+
+    global barcode_set
+    barcode_set = []
+    for sine in get_sines("B1.fasta"):
+        bar_codes = search_sines([sine], fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''))
+        barcode_set.append(bar_codes)
+ #       get_min_stats(detailed_stats)
+                                   
 #search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), step_print=500_000, nlines=10_000_000)
 #get_min_stats(bar_codes)
+#>>>>>>> Stashed changes
 
 #search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), 1)
 #search_sines("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''), 2)
@@ -328,8 +402,6 @@ for sine in get_sines("B1.fasta"):
  
 
 # # End of code, Saved results below
-
-# In[ ]:
 
 
 # Test results for 40, r1_old, 1000000
