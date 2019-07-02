@@ -11,12 +11,15 @@ def chunks(iterable, size):
     for first in iterator:
         yield itertools.chain([first], itertools.islice(iterator, size - 1))
 
-def split_recompress(basename, skip=0):
+def split_recompress(basename, skip=[]):
+    """
+    skip - indexes of parts to skip (still need to decompress but not compress)
+    """
     in_fname = f'{basename}.fastq.gz'
     with gzip.open(in_fname, 'rb') as in_fastq:
         for i, chunk in enumerate(chunks(in_fastq, 100_000_000)):
             out_fname = f'{basename}.part{i}e8.fastq.zst'
-            if i < skip:
+            if i in skip:
                 print('skipping', out_fname)
                 max(chunk)  # consume iterator
                 continue
@@ -31,9 +34,9 @@ def split_recompress(basename, skip=0):
                         out_fastq.write(line)
             t1 = time.time()
             print(t1 - t0, 'sec.', 'Last line:', line)
-    #os.remove(in_fname)
+    os.remove(in_fname)
 
-split_recompress('old_lung_R1_001', skip=28)
-# split_recompress('old_lung_R2_001', skip=6)
-# split_recompress('wt-lung_R1_001.fastq.gz')
-# split_recompress('wt-lung_R2_001.fastq.gz')
+split_recompress('old_lung_R1_001')
+split_recompress('old_lung_R2_001')
+split_recompress('wt-lung_R1_001.fastq.gz')
+split_recompress('wt-lung_R2_001.fastq.gz')
