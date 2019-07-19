@@ -7,6 +7,7 @@ from pprint import pprint
 
 import gzip
 import io
+import itertools
 import tre
 import random
 import difflib
@@ -81,6 +82,29 @@ start_time = None
 #def iupac_notation_to_regexp(iupac_string):
 
 
+def filter_potential_sines(records, sine_pattern, sine_header = 67, maxerr = 14):
+    re = tre.compile(sine_pattern[:sine_header], tre.EXTENDED)
+    fuzziness = tre.Fuzzyness(maxerr=maxerr)
+    
+    for rec in records:
+        match = re.search(str(rec.seq), fuzziness)
+        if match:
+            yield rec
+
+
+def write_filtered(base='wt-lung_R2_001', parts=30):
+    [B1] = get_sines_forward("B1.fasta")
+    for i in range(parts):
+        # Before running, copy/symlink input files into current dir:
+        # ln -s /media/anat/2Tincognita/anti-aging/*-lung/*part* .
+        in_fname = f'{base}.part{i}e8.fastq.zst'
+        out_fname = f'{base}.part{i}e8.potential_B1_head67err14.fastq'
+        records = fastq_zst_records(in_fname)
+        filtered = filter_potential_sines(records, B1)
+        print(f"Writing {out_fname}...")
+        SeqIO.write(filtered, out_fname, 'fastq')
+
+
 # standard use case: one sine at a time
 def search_sines(sines, r1_f, override = 0, upper_mut_dist = 20, step_print = 1000000, nlines = 100000000, sine_l = 70):
 
@@ -106,7 +130,7 @@ def search_sines(sines, r1_f, override = 0, upper_mut_dist = 20, step_print = 10
         r_sine = ''.join( [bases[ipnd_list[i]] for i in range(sine_l)] )
         r_sine_rc = ''.join( [bases[3-ind_list[i]] for i in range(sine_l)] )
         sine_set = [r_sine, r_sine_rc]
-        complete_regexp = '''|'''.join(sine_set)
+        complete_regexp = '|'.join(sine_set)
         p = tre.compile(complete_regexp, tre.EXTENDED)
 
     # Also specifies the shift  range   
@@ -127,7 +151,7 @@ def search_sines(sines, r1_f, override = 0, upper_mut_dist = 20, step_print = 10
             if i == 2:
                 break
             
-        complete_regexp = '''|'''.join(sine_set)
+        complete_regexp = '|'.join(sine_set)
         p = tre.compile(complete_regexp, tre.EXTENDED)     
 
         
@@ -274,15 +298,21 @@ def gz_strings(filename):
                 yield line.rstrip()
 
 def fastq_zst_strings(filename):
+    for rec in fastq_zst_records(filename):
+        yield str(rec.seq)
+
+def fastq_zst_records(filename):
     # https://github.com/indygreg/python-zstandard - pip3 install zstandard
     import zstandard as zstd
+    print(f"Reading {filename}...") 
     with open(filename, 'rb') as fastq_zst_handle:
         fastq_handle = zstd.ZstdDecompressor().stream_reader(fastq_zst_handle)
         # wrapper adds support for .readline(), for line in ...
         fastq_text = io.TextIOWrapper(fastq_handle, encoding='ascii')
         for record in SeqIO.parse(fastq_text, "fastq"):
-            yield str(record.seq)
-            
+            yield record
+
+               
 def zst_strings(filename):
     # https://github.com/indygreg/python-zstandard - pip3 install zstandard
     import zstandard as zstd
@@ -295,8 +325,15 @@ def zst_strings(filename):
             if i % 4 == 1:
                 yield line.rstrip()
 
-def get_sines(sine_f):
-    for (i,sine_record) in enumerate(SeqIO.parse(sine_f, "fasta")):
+def get_sines_forward(sine_fname):
+    """Only in direction given in file."""
+    for (i,sine_record) in enumerate(SeqIO.parse(sine_fname, "fasta")):
+        cur_seq = Seq(str(sine_record.seq), IUPAC.IUPACAmbiguousDNA())
+        yield str(cur_seq)
+
+def get_sines(sine_fname):
+    """As given in file + reverse complements."""
+    for (i,sine_record) in enumerate(SeqIO.parse(sine_fname, "fasta")):
         cur_seq = Seq(str(sine_record.seq), IUPAC.IUPACAmbiguousDNA())
         yield str(cur_seq)
         cur_seq_rc = cur_seq.reverse_complement()
@@ -319,6 +356,7 @@ good_lines = [
 ]
 #search_sines("mouse SINEs.fasta",good_lines)
 
+ 
 def get_min_stats2(cur_stats, ok_inter = 23, good_inter = 11, good_d = 4, ok_d = 6):
     # TODO Improve over the complexity here: Idea in mind works if there are only a few close ones for each string. 
     start_time = time()
@@ -425,172 +463,4 @@ def upper_level(frac = 0.25, pref_bound = 28, start_line = 0):
 
 # # End of code, Saved results below
 
-
-# Test results for 40, r1_old, 1000000
-'''0 3 / 5994000
-1 41 / 5994000
-2 344 / 5994000
-3 880 / 5994000
-4 1214 / 5994000
-5 1438 / 5994000
-6 1549 / 5994000
-7 1575 / 5994000
-8 1794 / 5994000
-9 2312 / 5994000
-10 3458 / 5994000
-11 4386 / 5994000
-12 5159 / 5994000
-13 6969 / 5994000
-14 11904 / 5994000
-15 32205 / 5994000
-16 106350 / 5994000
-17 313644 / 5994000
-18 728476 / 5994000
-19 1280632 / 5994000
-20 1449496 / 5994000
-21 1159602 / 5994000
-22 623602 / 5994000
-23 199311 / 5994000
-24 43522 / 5994000
-25 9264 / 5994000
-26 2935 / 5994000
-27 1247 / 5994000
-28 480 / 5994000
-29 146 / 5994000
-30 31 / 5994000
-31 16 / 5994000
-32 4 / 5994000
-33 6 / 5994000
-34 5 / 5994000'''
-
-# Test results for 40, r2_old, 1000000
-'''0 9 / 6000000
-1 41 / 6000000
-2 231 / 6000000
-3 724 / 6000000
-4 1044 / 6000000
-5 1318 / 6000000
-6 1469 / 6000000
-7 1527 / 6000000
-8 1651 / 6000000
-9 2176 / 6000000
-10 3229 / 6000000
-11 4060 / 6000000
-12 5038 / 6000000
-13 6622 / 6000000
-14 11872 / 6000000
-15 32432 / 6000000
-16 107532 / 6000000
-17 317798 / 6000000
-18 738101 / 6000000
-19 1281388 / 6000000
-20 1452101 / 6000000
-21 1156272 / 6000000
-22 615449 / 6000000
-23 199331 / 6000000
-24 43301 / 6000000
-25 9528 / 6000000
-26 3194 / 6000000
-27 1554 / 6000000
-28 501 / 6000000
-29 208 / 6000000
-30 81 / 6000000
-31 38 / 6000000
-32 48 / 6000000
-33 78 / 6000000
-34 54 / 6000000'''
-
-'''time elapsed  89.94379512866338 wt-r1, 1000000
-0 9 / 6000000
-1 79 / 6000000
-2 428 / 6000000
-3 1104 / 6000000
-4 1554 / 6000000
-5 1845 / 6000000
-6 1885 / 6000000
-7 1744 / 6000000
-8 1984 / 6000000
-9 2717 / 6000000
-10 3987 / 6000000
-11 4970 / 6000000
-12 6004 / 6000000
-13 7561 / 6000000
-14 13355 / 6000000
-15 35661 / 6000000
-16 117950 / 6000000
-17 343914 / 6000000
-18 779759 / 6000000
-19 1310694 / 6000000
-20 1441609 / 6000000
-21 1101603 / 6000000
-22 571210 / 6000000
-23 182370 / 6000000
-24 43364 / 6000000
-25 11148 / 6000000
-26 5102 / 6000000
-27 3058 / 6000000
-28 1677 / 6000000
-29 985 / 6000000
-30 421 / 6000000
-31 141 / 6000000
-32 55 / 6000000
-33 38 / 6000000
-34 14 / 6000000
-35 1 / 6000000'''
-
-'''time elapsed  15.340233178933461 old-r2, 30000000
-0 27 / 24000000
-1 257 / 24000000
-2 1431 / 24000000
-3 4034 / 24000000
-4 5505 / 24000000
-5 6258 / 24000000
-6 6354 / 24000000
-7 6010 / 24000000
-8 5526 / 24000000
-9 5572 / 24000000
-10 5902 / 24000000
-11 5906 / 24000000
-12 5881 / 24000000
-13 5863 / 24000000
-14 7052 / 24000000
-15 11016 / 24000000
-16 21563 / 24000000
-17 41693 / 24000000
-18 61513 / 24000000
-19 64138 / 24000000
-20 45925 / 24000000
-21 22032 / 24000000
-22 6930 / 24000000
-23 1498 / 24000000
-24 204 / 24000000
-25 39 / 24000000
-26 12 / 24000000
-28 1 / 24000000'''
-
-# ==================
-'''time elapsed  19.913855942090354 1000000 young r2
-0 8 / 6000000
-1 190 / 6000000
-2 623 / 6000000
-3 1446 / 6000000
-4 1821 / 6000000
-returning with nlines =  1000000'''
-
-#=============
-'''time elapsed  20.19312702814738 1000000 old r2
-0 9 / 6000000
-1 110 / 6000000
-2 419 / 6000000
-3 973 / 6000000
-4 1259 / 6000000
-returning with nlines =  1000000'''
-
-'''time elapsed 16.6222222050031 minutes
-0 9 / 6000000
-1 110 / 6000000
-2 419 / 6000000
-3 971 / 6000000
-4 1258 / 6000000
-returning with nlines = 1000000'''
 
