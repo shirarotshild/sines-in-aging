@@ -5,26 +5,25 @@
 
 from pprint import pprint
 
+import collections
+import difflib
+from fractions import Fraction
 import gzip
 import io
 import itertools
-import tre
+import os
 import random
-import difflib
-import collections
-import fractions
-from fractions import Fraction
+import re
+import sys
+from time import time
+
+import tre
 
 # http://biopython.org/
 import Bio
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
-
-import time
-from time import time
-
-import re
 
 # pip3 install python-Levenshtein==0.12.0
 import Levenshtein
@@ -92,9 +91,9 @@ def filter_potential_sines(records, sine_pattern, sine_header = 67, maxerr = 14)
             yield rec
 
 
-def write_filtered(base='wt-lung_R2_001', parts=30):
+def write_filtered(base='Young-lung/wt-lung_R2_001', parts=range(30)):
     [B1] = get_sines_forward("B1.fasta")
-    for i in range(parts):
+    for i in parts:
         # Before running, copy/symlink input files into current dir:
         # ln -s /media/anat/2Tincognita/anti-aging/*-lung/*part* .
         in_fname = f'{base}.part{i}e8.fastq.zst'
@@ -102,7 +101,9 @@ def write_filtered(base='wt-lung_R2_001', parts=30):
         records = fastq_zst_records(in_fname)
         filtered = filter_potential_sines(records, B1)
         print(f"Writing {out_fname}...")
-        SeqIO.write(filtered, out_fname, 'fastq')
+        # Rename when done to easily distinguish unfinished files.
+        SeqIO.write(filtered, out_fname + '.tmp', 'fastq')
+        os.rename(out_fname + '.tmp', out_fname)
 
 
 # standard use case: one sine at a time
@@ -455,12 +456,6 @@ def upper_level(frac = 0.25, pref_bound = 28, start_line = 0):
  
 #search_sines2("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''))
 
-# In[26]:
-
-# TODO: DO NOT USE?  20% faster but different results
-#search_sines("mouse SINEs.fasta", gz_strings('''old_lung_R2_001.fastq.gz'''), 10000)
- 
-
-# # End of code, Saved results below
-
-
+### MAIN ###
+[self, base, part] = sys.argv
+write_filtered(base, [int(part)])
