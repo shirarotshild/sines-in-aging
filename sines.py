@@ -17,7 +17,15 @@ import re
 import sys
 from time import time
 
+import sines_io
+from sines_io import fastq_gz_strings
+from sines_io import gz_strings
+from sines_io import fastq_zst_strings
+from sines_io import fastq_zst_records
+from sines_io import zst_strings
+
 import tre
+
 
 # http://biopython.org/
 import Bio
@@ -32,7 +40,7 @@ from Levenshtein import distance
 def test1(lim):
     nsegments = 0
     print('''starting test1''')
-    with gzip.open("wt-lung_R1_001.fastq.gz", "rt") as handle:
+    with gzip.open("Young-lung/wt-lung_R1_001.fastq.gz", "rt") as handle:
         for r in SeqIO.parse(handle, "fastq"):
             print(r.seq,'''\n==============''')
             nsegments += 1
@@ -106,7 +114,8 @@ def write_filtered(base='Young-lung/wt-lung_R2_001', parts=range(30)):
         os.rename(out_fname + '.tmp', out_fname)
 
 
-# standard use case: one sine at a time
+# TODO: Need to rewrite to get the sine + a barcode before (direct) / after (reversed-complemented)
+# For now, we want bar-code
 def search_sines(sines, r1_f, override = 0, upper_mut_dist = 20, step_print = 1000000, nlines = 100000000, sine_l = 70):
 
     print ('override =',override)
@@ -207,6 +216,8 @@ def verify(frac, res, f1 = 1, pref_bound = 20):
     return (frac <= f1) and (res[1] - pref_bound > 20)
   
 
+# Looks for barcodes that have a neighborhood of size d=4 (arbitrary) which is empty.
+# For each barcode we get the multiplicity
 def search_sines2(sine, r1_f, frac_bound, pref_bound, start_line = 0, step_print = 1000000, nlines = 200000000, thresh = 9, pref = 60):
 
     global stats
@@ -286,46 +297,6 @@ def search_sines2(sine, r1_f, frac_bound, pref_bound, start_line = 0, step_print
 '''|'''.join(['''foo''', '''bar''','''ooki'''])
 
 
-def fastq_gz_strings(filename):
-    with gzip.open(filename, "rt") as handle:
-        for record in SeqIO.parse(handle, "fastq"):
-            yield str(record.seq)
-
-def gz_strings(filename):
-    with gzip.open(filename, "rt") as text:    
-        for i, line in enumerate(text):
-            # records of 4 lines: @header, dna, +, quality
-            if i % 4 == 1:
-                yield line.rstrip()
-
-def fastq_zst_strings(filename):
-    for rec in fastq_zst_records(filename):
-        yield str(rec.seq)
-
-def fastq_zst_records(filename):
-    # https://github.com/indygreg/python-zstandard - pip3 install zstandard
-    import zstandard as zstd
-    print(f"Reading {filename}...") 
-    with open(filename, 'rb') as fastq_zst_handle:
-        fastq_handle = zstd.ZstdDecompressor().stream_reader(fastq_zst_handle)
-        # wrapper adds support for .readline(), for line in ...
-        fastq_text = io.TextIOWrapper(fastq_handle, encoding='ascii')
-        for record in SeqIO.parse(fastq_text, "fastq"):
-            yield record
-
-               
-def zst_strings(filename):
-    # https://github.com/indygreg/python-zstandard - pip3 install zstandard
-    import zstandard as zstd
-    with open(filename, 'rb') as fastq_zst_handle:
-        fastq_handle = zstd.ZstdDecompressor().stream_reader(fastq_zst_handle)
-        # wrapper adds support for .readline(), for line in ...
-        fastq_text = io.TextIOWrapper(fastq_handle, encoding='ascii')
-        for i, line in enumerate(fastq_text):
-            # records of 4 lines: @header, dna, +, quality
-            if i % 4 == 1:
-                yield line.rstrip()
-
 def get_sines_forward(sine_fname):
     """Only in direction given in file."""
     for (i,sine_record) in enumerate(SeqIO.parse(sine_fname, "fasta")):
@@ -340,8 +311,6 @@ def get_sines(sine_fname):
         cur_seq_rc = cur_seq.reverse_complement()
         yield str(cur_seq_rc)
         print(cur_seq, cur_seq_rc, '''\n ======================''')
-
-            
 
 print('''Here come the SINES!''')
 
@@ -457,5 +426,5 @@ def upper_level(frac = 0.25, pref_bound = 28, start_line = 0):
 #search_sines2("mouse SINEs.fasta",fastq_gz_strings('''wt-lung_R1_001.fastq.gz'''))
 
 ### MAIN ###
-[self, base, part] = sys.argv
+[base, part] = sys.argv[1:]
 write_filtered(base, [int(part)])
