@@ -36,7 +36,7 @@ def split_recompress(basename, skip=[]):
             print(t1 - t0, 'sec.', 'Last line:', line)
     os.remove(in_fname)
 
-split_recompress('old_lung_R1_001')
-split_recompress('old_lung_R2_001')
-split_recompress('wt-lung_R1_001.fastq.gz')
-split_recompress('wt-lung_R2_001.fastq.gz')
+split_recompress('Old-lung/old_lung_R1_001')
+split_recompress('Old-lung/old_lung_R2_001')
+split_recompress('Young-lung/wt-lung_R1_001')
+split_recompress('Young-lung/wt-lung_R2_001')
