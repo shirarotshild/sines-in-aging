@@ -20,7 +20,7 @@ from Bio.Alphabet import IUPAC
 common_req = 20
 init_err = 3
 tot_err = 3
-padding = 20
+padding = 0
 step = 10000
 
 def merged_paired_ends(records1, records2):
@@ -69,16 +69,18 @@ def merged_paired_ends(records1, records2):
                 
             
 ### MAIN ###
-[base1, base2, part, out_base] = sys.argv[1:]
+[base1, base2, out_base] = sys.argv[1:]
 def write_merged():
-    out_fname = f'{out_base}.part{part}e8.merged.fastq'
-    in_fname1 = f'{base1}.part{part}e8.fastq.zst'
-    in_fname2 = f'{base2}.part{part}e8.fastq.zst'
+    out_fname = f'{out_base}.merged.fastq'
+    in_fname1 = f'{base1}.fastq.gz'
+    in_fname2 = f'{base2}.fastq.gz'
     # We assume for now all records match. Generally, need to verify.
     print('About to merge ',in_fname1, in_fname2)
-    records1 = fastq_zst_records(in_fname1)
-    records2 = fastq_zst_records(in_fname2)
-    merged = merged_paired_ends(records1, records2)
+    with open_any(in_fname1, 'rb') as in_f1_handle:
+        records1 = SeqIO.parse(in_f1_handle)
+        with open_any(in_fname2, 'rb') as in_f2_handle:
+            records2 = gene_records_parse(in_f2_handle)
+            merged = merged_paired_ends(records1, records2)
     print('about to write ', out_fname + '.tmp')
     Bio.SeqIO.write(merged, out_fname + '.tmp', 'fastq')
     os.rename(out_fname + '.tmp', out_fname)    
