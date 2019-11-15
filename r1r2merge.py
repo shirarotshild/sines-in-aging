@@ -3,6 +3,7 @@ import math
 import tre
 import sys
 import sines_io
+import gene_lib
 from sines_io import fastq_zst_records
 from Bio.SeqRecord import SeqRecord
 import math
@@ -29,7 +30,7 @@ def merged_paired_ends(records1, records2):
     tot = 0
     print('in merged_paired_ends',records1,records2)
     for (rec1,rec2) in zip(records1, records2):
-        tot += 1 
+        tot += 1
         str1 = str(rec1.seq)
         str2 = str(rec2.seq.reverse_complement())
         end1 = str1[-common_req:]
@@ -76,13 +77,13 @@ def write_merged():
     in_fname2 = f'{base2}.fastq.gz'
     # We assume for now all records match. Generally, need to verify.
     print('About to merge ',in_fname1, in_fname2)
-    with open_any(in_fname1, 'rb') as in_f1_handle:
-        records1 = SeqIO.parse(in_f1_handle)
-        with open_any(in_fname2, 'rb') as in_f2_handle:
-            records2 = gene_records_parse(in_f2_handle)
+    with gene_lib.open_any(in_fname1, 'rt') as in_f1_handle:
+        records1 = SeqIO.parse(in_f1_handle,"fastq")
+        with gene_lib.open_any(in_fname2, 'rt') as in_f2_handle:
+            records2 = SeqIO.parse(in_f2_handle,"fastq")
             merged = merged_paired_ends(records1, records2)
-    print('about to write ', out_fname + '.tmp')
-    Bio.SeqIO.write(merged, out_fname + '.tmp', 'fastq')
-    os.rename(out_fname + '.tmp', out_fname)    
-        
+            print('about to write ', out_fname + '.tmp')
+            Bio.SeqIO.write(merged, out_fname + '.tmp', 'fastq')
+    os.rename(out_fname + '.tmp', out_fname)
+
 write_merged()
