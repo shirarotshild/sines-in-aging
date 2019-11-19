@@ -20,8 +20,8 @@ from Bio.Alphabet import IUPAC
 
 #current file generated with 15, 4
 common_req = 20
-init_err = 3
-tot_err = 3
+init_err = 4
+tot_err = 4
 padding = 0
 step = 10000
 
@@ -29,11 +29,12 @@ def merged_paired_ends(records1, records2):
     tot_good = 0
     tot_great = 0
     tot = 0
-    print('in merged_paired_ends',records1,records2)
+#    print('in merged_paired_ends',records1,records2)
     for (rec1,rec2) in zip(records1, records2):
         tot += 1
         str1 = str(rec1.seq)
         str2 = str(rec2.seq.reverse_complement())
+#        print('-------------------------------------------\n matching ',str1,'\n',str2,'\n===================================================')
         end1 = str1[-common_req:]
         re = tre.compile(end1, tre.EXTENDED)
         # we expect small errors here
@@ -46,18 +47,20 @@ def merged_paired_ends(records1, records2):
             fuzzyness = max(tot_err, ceil(0.1*to_search_len))
             re = tre.compile(str1[-to_search_len :], tre.EXTENDED)
             match_tot = re.search(str2, tre.Fuzzyness(maxerr = fuzzyness))
-
+ #           print('step1: matched ',end1,' at',match_loc,' testing prefix ',str2[:to_search_len],'cost ',match.cost)
             if match_tot:
             #    if (tot_good % 100 == 0):
             #        print('fuzzyness = ', fuzzyness)
+  #              print('step2: matched ',str1[-to_search_len:],' at',match_tot.groups()[0][0],' testing prefix ','cost ',match.cost)
                 tot_great += 1
                 # An arbitrary decision: take the common string from r2
-                res_str = end1[ : -to_search_len] + str2
+                res_str = str1[ : -to_search_len] + str2
                 # TODO: preserve qualities
                 res_seq = SeqRecord(Seq(res_str), id=rec1.id, name=rec1.name, description = rec1.description, letter_annotations =
                                     {"phred_quality":[30 for i in range(len(res_str))]})
                 if (tot_great % step == 0):
                     print('nicely matched ',str1,'\n',str2, to_search_len, match_tot.group(0), match.group(0), match_tot.cost, match.cost)
+   #             print('result = ',str(res_seq.seq))
                 yield res_seq
                 continue
 
@@ -67,6 +70,7 @@ def merged_paired_ends(records1, records2):
         if  (tot % step == 0):
             print (tot, tot_good, tot_great)
            # print('matched ',str1,'\n',str2, len(str1), len(str2))
+  #      print('result = ',str(res_seq.seq))
         yield res_seq
 
 
