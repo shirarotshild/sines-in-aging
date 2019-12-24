@@ -510,7 +510,7 @@ def run_part_1(in_file, B_file, out_dir):
                                          file_base + '_withSine' + file_ext,
                                          file_base + '_sineLocation' + file_ext)
 
-def run_all(in_file, B_file, out_dir):
+def run_all(in_file, B_file, out_dir, mode = 3):
     file_ext = None
     for ext in ['.fastq', '.fastq.gz', '.fastq.bz2']:
         if in_file.endswith(ext):
@@ -527,16 +527,23 @@ def run_all(in_file, B_file, out_dir):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    print_step("Start filter_potential_sines_and_locations")
-    filter_potential_sines_and_locations(in_file, B_file,
-                                         file_base + '_withSine' + file_ext,
-                                         file_base + '_sineLocation' + file_ext)
-     
-    print_step("Start filter_potential_sines_barcode")
-    filter_potential_sines_barcode(36, file_base + '_withSine' + file_ext,
-                                       file_base + '_sineLocation' + file_ext,
-                                       file_base + '_sineBarcode' + file_ext)
-     
+    # part 0 - detect potential sines
+    if (mode == 1):
+        print_step("Start filter_potential_sines_and_locations")
+        filter_potential_sines_and_locations(in_file, B_file,
+                                             file_base + '_withSine' + file_ext,
+                                             file_base + '_sineLocation' + file_ext)
+        return
+
+    # part 1 - detect barcodes of potential sines
+    if (mode == 2): 
+        print_step("Start filter_potential_sines_barcode")
+        filter_potential_sines_barcode(36, file_base + '_withSine' + file_ext,
+                                           file_base + '_sineLocation' + file_ext,
+                                           file_base + '_sineBarcode' + file_ext)
+        return 
+
+    # part 2 - identify new sines
     print_step("Start new_SINES_Initial_filter_rec")
     new_SINES_Initial_filter_rec(file_base + '_sineBarcode' + file_ext,
                                  file_base + '_potentialNewSINE' + file_ext,

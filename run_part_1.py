@@ -1,11 +1,13 @@
 #!/usr/bin/env python3.6
 
+from organized_all import run_all
 from organized_all import run_part_1
+import sys
 
 # TODO decide what command line params we need
-[merged_input_fname, sine_name, output_dir] = sys.argv[1:]
+[merged_input_fname, sine_name, output_dir, mode] = sys.argv[1:]
 
-run_all(merged_input_fname, sine_name, output_dirq)
+run_all(merged_input_fname, sine_name, output_dir, int(mode))
 
 # run_all("/media/sf_gene/unified/wt-lung_unified_001.fastq.gz",
 #         "/media/sf_gene/original/B1.fasta",
@@ -78,6 +80,6 @@ run_all(merged_input_fname, sine_name, output_dirq)
 #        "/media/sf_gene/original/B4.fasta",
 #        "/media/sf_gene2/B4-old_R1")
 
-run_part_1("/media/sf_gene2/original_old/old_lung_R2_001.fastq.gz",
-        "/media/sf_gene/original/B4.fasta",
-        "/media/sf_gene2/B4-old_R2")
+#run_part_1("/media/sf_gene2/original_old/old_lung_R2_001.fastq.gz",
+#        "/media/sf_gene/original/B4.fasta",
+#        "/media/sf_gene2/B4-old_R2")

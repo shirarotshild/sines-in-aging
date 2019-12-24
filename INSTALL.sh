@@ -26,3 +26,4 @@ git clone https://github.com/ahomansikka/tre
 
 # Biopython
 pip3.6 install --user biopython
+pip3.6 install --user tqdm
