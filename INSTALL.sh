@@ -24,6 +24,6 @@ git clone https://github.com/ahomansikka/tre
   python3.6 setup.py install --user
 )
 
-# Biopython
 pip3.6 install --user biopython
 pip3.6 install --user tqdm
+pip3.6 install --user zstandard
