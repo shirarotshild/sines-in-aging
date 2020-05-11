@@ -1,5 +1,10 @@
 #!/bin/bash -x
 
+# Fail on errors, so-called "bash strict mode"
+set -euo pipefail
+
+cat /etc/lsb-release  # Just to see which Ubuntu version we're on
+
 # For python 3.6 on ubuntu 16.04
 # https://askubuntu.com/questions/865554/how-do-i-install-python-3-6-using-apt-get
 if ! which python3.6
