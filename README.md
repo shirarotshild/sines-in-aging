@@ -2,9 +2,11 @@ TODO document all stages
 
 # Install tools
 
-On ubuntu linux, try running INSTALL.sh
+On ubuntu linux, try running `./INSTALL/ALL.sh`.
 
-Note it installs python libraries for a _single_ python version.
+Note it installs python libraries for a _single_ python version.  All our *.py scripts should use that version.
+
+See INSTALL/README.md for details on install script.
 
 # Dowload input from AWS S3 storage
 

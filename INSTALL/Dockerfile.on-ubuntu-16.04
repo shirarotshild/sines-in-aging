@@ -1,0 +1,34 @@
+# Test whether install would work, on a fresh ubuntu.
+# This is done inside a "container", without touching the external machine. 
+
+FROM ubuntu:16.04
+
+# Simulate script running as non-root user, with ability to `sudo`
+# ----------------------------------------------------------------
+RUN useradd --create-home user
+RUN apt-get update
+RUN apt-get install --yes sudo
+RUN echo 'user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+USER user
+
+# Now actually run the script:
+# ----------------------------
+
+WORKDIR /tmp
+
+#COPY ALL.sh ALL.sh
+#RUN ./ALL.sh
+
+# ^^ Instead of running the whole script, which takes a long time every time,
+# we split it into parts.  Copying them one-by-one takes advantage of 
+# docker caching - will re-run only from the first part that changed.
+
+COPY python.sh python.sh
+RUN ./python.sh
+
+COPY libraries.sh libraries.sh
+RUN ./libraries.sh
+
+# Did we install any useful binaries with `pip install --user`?
+# That's OK, but people need to know to add it to their $PATH, so let's check:
+RUN ls -l /home/user/.local/bin/ || true
