@@ -8,6 +8,7 @@ python3.6 -m pip install --user zstandard
 python3.6 -m pip install --user tqdm
 
 # Install tre regexp-up-to-edit-distance library
+sudo apt-get update
 sudo apt-get install --yes agrep libtre-dev git
 git clone https://github.com/ahomansikka/tre
 (

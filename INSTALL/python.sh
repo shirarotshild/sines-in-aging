@@ -5,6 +5,7 @@ set -e -u -o pipefail
 
 cat /etc/lsb-release  # Just to see which Ubuntu version we're on
 
+sudo apt-get update
 sudo apt-get install --yes curl
 sudo apt-get install --yes software-properties-common # for add-apt-repository
 
