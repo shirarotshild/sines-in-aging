@@ -12,6 +12,10 @@ from Bio.Alphabet import IUPAC
 from itertools import product, repeat
 from multiprocessing import Process
 
+#to save agraph photo
+#from matplotlib import pyplot as plt 
+#import numpy as np
+
 try:
     from itertools import izip as zip
 except ImportError: # will be 3.x series
@@ -318,6 +322,49 @@ def build_dictionary(in_file_prefix, out_file_dict, sine_barcode_len = 36, maxer
 
 
 
+#==== dictionary build====#
+#the same dictionary, only this one save in the "sec_dict" a list of all the id with the same barcode.
+#in_file_prefix- the barcodes, out_file_dict- the dictionary-empty at first.
+def build_dictionary_for_histogram(in_file_prefix, out_file_dict, sine_barcode_len = 36, maxerr = 3):#main_key_len=9):
+	assert sine_barcode_len % (maxerr + 1) == 0
+	main_key_len = int(sine_barcode_len / (maxerr + 1))
+	main_dict = {}
+
+	print_step("Start build_dictionary: product of 'ATCGN'")
+	for tuple in tqdm(product('ATCGN', repeat=main_key_len)): #product returns iterator
+		#print(tuple)
+		main_key = "".join([str(x) for x in tuple]) #without str() ??
+		#print(main_key)
+		main_dict[main_key] = {}
+
+	print_step("Start build_dictionary: fill with records")
+	with open_any(in_file_prefix, "rt") as handle_read_prefix:
+		records = gene_records_parse(handle_read_prefix)
+		for rec in tqdm(records):
+			# barcode_parts_list = barcode_parts(rec, main_key_len)
+			# for rec_part in barcode_parts_list:
+			str_barc = str(rec.seq)
+			for rec_part in barcode_wins(rec, main_key_len):
+				str_barc_part = str(rec_part.seq)
+				sec_dict = main_dict[str_barc_part]
+				if sec_dict.get(str_barc) is None:
+					sec_dict[str_barc] = [rec.id]
+				else:
+					sec_dict[str_barc].append(rec.id)
+					
+
+	print_step("Start build_dictionary: write to file")
+	with open_any(out_file_dict, "wb") as handle_dict:
+		pickle.dump(main_dict, handle_dict, protocol=pickle.HIGHEST_PROTOCOL)
+		handle_dict.flush()
+		
+	print_step("Start build_dictionary: done")
+
+	#dict = build_dictionary('/media/sf_gene/10k_data/unif10k_sineBarcode.fastq.gz')
+
+
+
+
 #====check barcode match to its inner dict barcodes====#
 # this function gets the barcode, its id, a dictionary contains all the records we want to check match with,
 # and a maximum error argument for the check
@@ -329,6 +376,21 @@ def is_match_barcodes(sec_dict, barcode_id, re, fuzziness):
             if match:
                 return True
     return False
+
+
+#====check barcode match to its inner dict barcodes====#
+# this function gets the barcode, its id, a dictionary contains all the records we want to check match with,
+# and a maximum error argument for the check
+# it update the match list
+def is_match_barcodes_hist(sec_dict, barcode_id, re, fuzziness, match):
+	for key, val in sec_dict.items():
+		
+		if re.search(str(key), fuzziness):
+			if ((val[0] in match) == False):
+				match.extend(val)
+				
+				#print(len(val),len(match))
+				
 
 
 #====check matching of two string by tre====#
@@ -366,6 +428,34 @@ def new_SINES_filter_proc(q, main_dict, key_size, fuzziness):
             q.put((rec, match))
     
     print("Slave process exited")
+	
+	
+# the same as the previous function,
+# only here the match is a list of all the barcodes id that close to the barcode
+def new_SINES_filter_proc_histogram(q, main_dict, key_size, fuzziness):
+    while True:
+        recs = q.get()
+        # print (rec)
+
+        if recs is None:
+            q.put(None)
+            break
+
+        for rec in recs:
+            str_barc = str(rec.seq)
+            re = tre.compile(str_barc, tre.EXTENDED)
+            barc_parts_list = barcode_parts(rec, key_size)
+            match = []
+            
+            for rec_part in barc_parts_list:
+                is_match_barcodes_hist(main_dict[str(rec_part.seq)], rec.id, re, fuzziness, match)
+                    
+                    
+
+            q.put((rec, match))
+    
+    print("Slave process exited")	
+
 
 def new_SINES_filter_write(q, handle_write_inherited, handle_write_new, wait_none=False):
     while not q.empty() or wait_none:
@@ -384,6 +474,20 @@ def new_SINES_filter_write(q, handle_write_inherited, handle_write_new, wait_non
 
     # handle_write_inherited.flush()
     # handle_write_new.flush()
+
+
+# 
+def update_distribution(q, distribution_of_neighbors, wait_none: bool=False):
+	while not q.empty() or wait_none:
+		obj = q.get()
+
+		if obj is None:
+			assert wait_none
+			break
+
+		(rec, match) = obj
+		distribution_of_neighbors[len(match)-1] = distribution_of_neighbors[len(match)-1] + 1# Can create an exception, change the size
+
 
 #====new sines filter====#
 # this function do a second filtering (with d = maxerr) to the sines prefixes.
@@ -464,6 +568,80 @@ def new_SINES_filter(in_file_initial_filtering, out_file_new_SINES, out_file_inh
             proc['p'].join()
             
 
+#in_file_initial_filtering- the barcodes, main_dict- the dictionary, distribution_of_neighbors- list
+def new_SINES_filter_for_histogram(in_file_initial_filtering, main_dict, distribution_of_neighbors, key_size=9, maxerr=3):
+
+	fuzziness = tre.Fuzzyness(maxerr=maxerr)
+
+	# Create slave processes
+	procs = []
+	for _ in range(multiprocessing.cpu_count() - 3):
+		# Create a communication queue between this process and slave process
+		q = GeneDQueue()
+		
+		# Create and start slave process
+		p = Process(target=new_SINES_filter_proc_histogram, args=(q, main_dict, key_size, fuzziness))
+		p.start()
+
+		procs.append({
+			'p': p,
+			'q': q,
+			'batch': [],
+			'write_i': 0
+		})
+
+	with open_any(in_file_initial_filtering, "rt") as handle_read_initial_filtering:
+
+		records = gene_records_parse(handle_read_initial_filtering)
+		rec_i = 0
+		for rec in tqdm(records):
+			# Simple round-robin between the slave processes
+			proc = procs[rec_i % len(procs)]
+			# Add a new record into a local batch array of slave process
+			proc['batch'].append(rec)
+
+			if len(proc['batch']) >= 10:
+				update_distribution(proc['q'], distribution_of_neighbors)
+				
+
+				# Put batch of new records into slave process queue
+				proc['q'].put(proc['batch'])
+
+				# Reset local batch of slave process
+				proc['batch'] = []
+
+			# Uncomment for testing a small amount of records
+			# if rec_i == 100000:
+			#     break
+
+			rec_i += 1
+		
+		print_step("cleanup")
+		
+		# Cleanup slave processes
+		for proc in procs:
+			# Get found potential sine from slave process queue, before last batch
+			update_distribution(proc['q'], distribution_of_neighbors)# למה?
+
+		for proc in procs:
+			# Put last batch, if avaliable
+			if len(proc['batch']):
+				proc['q'].put(proc['batch'])
+				proc['batch'] = []
+			
+		for proc in procs:
+			# Make slave proccess terminate
+			proc['q'].put(None)
+			
+		for proc in procs:
+			# Get found potential sine from slave process queue, very last time
+			update_distribution(proc['q'], distribution_of_neighbors, wait_none = True)
+
+		for proc in procs:
+			# Wait for termination
+			proc['p'].join()
+
+
 
 # new_SINES_filter('/media/sf_gene/10k_data/unif10k_potentialNewSINE.fastq.gz',
 #                  '/media/sf_gene/10k_data/unif10k_NewSINE.fastq.gz',
@@ -481,6 +659,29 @@ def SINES_new_or_inherited(in_file_dict,
     print_step("Start new_SINES_filter")
     new_SINES_filter(in_file_initial_filtering, out_file_new_SINES, out_file_inherited_SINES, dict)
 
+
+
+# in_file_dict- the dictionary, in_file_initial_filtering - the barcodes, distribution_of_neighbors- list for counting the neighbors of barcods.
+def SINES_histogram_of_neighbors(in_file_dict, in_file_initial_filtering, distribution_of_neighbors):
+	print_step("Start SINES_new_or_inherited: load dict")
+	with open_any(in_file_dict, "rb") as handle_dict:
+		dict = pickle.load(handle_dict)
+
+	print_step("Start new_SINES_filter")
+	new_SINES_filter_for_histogram(in_file_initial_filtering, dict, distribution_of_neighbors)
+
+#activate the last lines to create a graph
+def print_histogram(distribution_of_neighbors):
+	print(distribution_of_neighbors)
+	#indices = np.arange(len(distribution_of_neighbors))
+	#plt.bar(indices, distribution_of_neighbors)
+	
+	#plt.title('distribution of neighbors')
+	#plt.ylabel('number of barcods')
+	#plt.xlabel('number of neighbors')
+	
+
+	#plt.savefig('histogram.png')
 
 
 #SINES_new_or_inherited('/media/sf_gene/10k_data/unif10k_sineBarcode.fastq.gz',
@@ -511,60 +712,71 @@ def run_part_1(in_file, B_file, out_dir):
                                          file_base + '_sineLocation' + file_ext)
 
 def run_all(in_file, B_file, out_dir, mode = 3):
-    file_ext = None
-    for ext in ['.fastq', '.fastq.gz', '.fastq.bz2']:
-        if in_file.endswith(ext):
-            file_ext = ext
-            break
+	file_ext = None
+	for ext in ['.fastq', '.fastq.gz', '.fastq.bz2']:
+		if in_file.endswith(ext):
+			file_ext = ext
+			break
 
-    assert file_ext != None, "Unknown file extension in %s" % (in_file)
+	assert file_ext != None, "Unknown file extension in %s" % (in_file)
 
-    file_base = out_dir + '/' + os.path.basename(in_file[:-len(file_ext)])
+	file_base = out_dir + '/' + os.path.basename(in_file[:-len(file_ext)])
 
-    print_step("file_base = %s, file_ext = %s" % (file_base, file_ext))
-    print_step()
+	print_step("file_base = %s, file_ext = %s" % (file_base, file_ext))
+	print_step()
 
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+	if not os.path.exists(out_dir):
+		os.makedirs(out_dir)
 
-    # part 0 - detect potential sines
-    if (mode == 1):
-        print_step("Start filter_potential_sines_and_locations")
-        filter_potential_sines_and_locations(in_file, B_file,
-                                             file_base + '_withSine' + file_ext,
-                                             file_base + '_sineLocation' + file_ext)
-        return
+	# part 0 - detect potential sines
+	if (mode == 1):
+		print_step("Start filter_potential_sines_and_locations")
+		filter_potential_sines_and_locations(in_file, B_file,
+											 file_base + '_withSine' + file_ext,
+											 file_base + '_sineLocation' + file_ext)
+		return
 
-    # part 1 - detect barcodes of potential sines
-    if (mode == 2): 
-        print_step("Start filter_potential_sines_barcode")
-        filter_potential_sines_barcode(36, file_base + '_withSine' + file_ext,
-                                           file_base + '_sineLocation' + file_ext,
-                                           file_base + '_sineBarcode' + file_ext)
-        return 
+	# part 1 - detect barcodes of potential sines
+	if (mode == 2): 
+		print_step("Start filter_potential_sines_barcode")
+		filter_potential_sines_barcode(36, file_base + '_withSine' + file_ext,
+										   file_base + '_sineLocation' + file_ext,
+										   file_base + '_sineBarcode' + file_ext)
+		return 
+		
 
-    # part 2 - identify new sines
-    print_step("Start new_SINES_Initial_filter_rec")
-    new_SINES_Initial_filter_rec(file_base + '_sineBarcode' + file_ext,
-                                 file_base + '_potentialNewSINE' + file_ext,
-                                 file_base + '_inheritedSINE' + file_ext)
-
-    print_step("Start build_dictionary")
-    build_dictionary(file_base + '_sineBarcode' + file_ext,
-                            file_base + '_mainDict' + file_ext)
-
-    print_step("Start SINES_new_or_inherited")
-    SINES_new_or_inherited(file_base + '_mainDict' + file_ext,
-                           file_base + '_potentialNewSINE' + file_ext,
-                           file_base + '_NewSINE' + file_ext,
-                           file_base + '_inheritedSINE_2' + file_ext)
-
-    print_step("DONE ALL!")
+	
+	if(mode == 4):
+		print_step("Start build_dictionary")
+		build_dictionary_for_histogram(file_base + '_sineBarcode' + file_ext,
+								file_base + '_mainDict' + file_ext)
 
 
-
-
-
+		distribution_of_neighbors = [0]*50#with big files increase the size
+		print_step("Start SINES_new_or_inherited histogram")
+		SINES_histogram_of_neighbors(file_base + '_mainDict' + file_ext,
+									 file_base + '_sineBarcode' + file_ext,
+									 distribution_of_neighbors)
+		print_histogram(distribution_of_neighbors)
+		return
+	# part 2 - identify new sines
+	
+	print_step("Start build_dictionary")
+	build_dictionary(file_base + '_sineBarcode' + file_ext,
+							file_base + '_mainDict' + file_ext)
 
 
 
+	print_step("Start new_SINES_Initial_filter_rec")
+	new_SINES_Initial_filter_rec(file_base + '_sineBarcode' + file_ext,
+								 file_base + '_potentialNewSINE' + file_ext,
+								 file_base + '_inheritedSINE' + file_ext)
+
+
+	print_step("Start SINES_new_or_inherited")
+	SINES_new_or_inherited(file_base + '_mainDict' + file_ext,
+						   file_base + '_potentialNewSINE' + file_ext,
+						   file_base + '_NewSINE' + file_ext,
+						   file_base + '_inheritedSINE_2' + file_ext)
+
+	print_step("DONE ALL!")
