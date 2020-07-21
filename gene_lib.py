@@ -51,8 +51,8 @@ def open_any(filename, mode):
     elif filename.endswith('.fastq') or filename.endswith('.fasta'):
         return open(filename, mode)
 
-    assert False, "Unknown file extension in %s" % (filename)
-
+    log("Warning: Unknown file extension in %s, treating as uncompressed" % (filename))
+    return open(filename, mode)
 
 # Replace Bio SeqRecord for performance
 #
