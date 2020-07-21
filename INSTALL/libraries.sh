@@ -15,3 +15,6 @@ git clone https://github.com/ahomansikka/tre
     cd tre/python3
     python3.6 setup.py install --user
 )
+
+# the GNU `parallel` tool
+sudo apt-get install --yes parallel
