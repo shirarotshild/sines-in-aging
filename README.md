@@ -21,16 +21,32 @@ aws s3 cp s3://endogene/mice_wgs/Aging/Old-liver/old_liver_R1_001.fastq.gz Old-l
 
 Now repeat for `_R2_` and for both Old and Young samples — but if you're short on disk space, you'll want to next steps for each one so you can delete inputs...
 
-- [ ] TODO: learn to stream from S3, and/or mount S3 as a virtual file system.
+## streaming
 
-# breaking into parts
+The command supports `-` as either source (meaning stdin) or destination (meaning stdout):
+```
+aws s3 cp s3://endogene/mice_wgs/Aging/Old-liver/old_liver_R1_001.fastq.gz - | gunzip --stdout | head --lines=20
+```
+
+# breaking into chunks
 
 for example in p53-liver
 ```
-~/sines-in-aging/split_recompress.py p53-liver_R1_001
-~/sines-in-aging/split_recompress.py p52-liver_R2_001
+~/sines-in-aging/split_recompress.py p53-liver_R1_001.fastq.gz p53-liver_R1_001
+~/sines-in-aging/split_recompress.py p52-liver_R2_001.fastq.gz p53-liver_R2_001
 ...
 ```
+This cuts input into chunks of 100 000 000 (1e8) lines, writing files named:
+```
+p53-liver_R1_001.part0e8.fastq.gz
+p53-liver_R1_001.part1e8.fastq.gz
+...
+p53-liver_R1_001.part27e8.fastq.gz
+...
+```
+(last chunk will be smaller.)
+
+This allows following steps to be run from the middle and/or parallelized.
 
 # r1r2merge.py
 
