@@ -1,5 +1,3 @@
-from pprint import pprint
-
 import collections
 import difflib
 from fractions import Fraction
@@ -17,6 +15,8 @@ import Bio
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
+
+from gene_lib import log
 
 def fastq_gz_strings(filename):
     with gzip.open(filename, "rt") as handle:
@@ -37,7 +37,7 @@ def fastq_zst_strings(filename):
 def fastq_zst_records(filename):
     # https://github.com/indygreg/python-zstandard - pip3 install zstandard
     import zstandard as zstd
-    print(f"Reading {filename}...") 
+    log(f"Reading {filename}...") 
     with open(filename, 'rb') as fastq_zst_handle:
         fastq_handle = zstd.ZstdDecompressor().stream_reader(fastq_zst_handle)
         # wrapper adds support for .readline(), for line in ...

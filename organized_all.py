@@ -28,10 +28,10 @@ from tqdm import tqdm
 import os
 from gene_lib import *
 
-#print(open_any("/media/sf_gene/original/B1.fasta", "rt"))
-#print(open_any("/media/sf_gene/original/wt-lung_R1_001.fastq.gz", "rt"))
-#print(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2", "r"))
-#print(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2.blabla", "rt"))
+#log(open_any("/media/sf_gene/original/B1.fasta", "rt"))
+#log(open_any("/media/sf_gene/original/wt-lung_R1_001.fastq.gz", "rt"))
+#log(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2", "r"))
+#log(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2.blabla", "rt"))
 
 
 #sys.exit()
@@ -60,7 +60,7 @@ def get_sines_forward(sine_fname):
 def filter_potential_sines_and_locations_proc(q, re, fuzziness):
     while True:
         recs = q.get()
-        # print (rec)
+        # log(rec)
 
         if recs is None:
             break
@@ -68,7 +68,7 @@ def filter_potential_sines_and_locations_proc(q, re, fuzziness):
         for rec in recs:
             match = re.search(str(rec.seq), fuzziness)
             if match:
-                # print(rec.seq)
+                # log(rec.seq)
                 sine_location = match.groups() #returns tuple of tuples (in this case: ((2,78), ) for example
 
                 q.put((rec, sine_location))
@@ -293,9 +293,9 @@ def build_dictionary(in_file_prefix, out_file_dict, sine_barcode_len = 36, maxer
 
     print_step("Start build_dictionary: product of 'ATCGN'")
     for tuple in tqdm(product('ATCGN', repeat=main_key_len)): #product returns iterator
-        #print(tuple)
+        #log(tuple)
         main_key = "".join([str(x) for x in tuple]) #without str() ??
-        #print(main_key)
+        #log(main_key)
         main_dict[main_key] = {}
     
     print_step("Start build_dictionary: fill with records")
@@ -332,9 +332,9 @@ def build_dictionary_for_histogram(in_file_prefix, out_file_dict, sine_barcode_l
 
 	print_step("Start build_dictionary: product of 'ATCGN'")
 	for tuple in tqdm(product('ATCGN', repeat=main_key_len)): #product returns iterator
-		#print(tuple)
+		#log(tuple)
 		main_key = "".join([str(x) for x in tuple]) #without str() ??
-		#print(main_key)
+		#log(main_key)
 		main_dict[main_key] = {}
 
 	print_step("Start build_dictionary: fill with records")
@@ -389,7 +389,7 @@ def is_match_barcodes_hist(sec_dict, barcode_id, re, fuzziness, match):
 			if ((val[0] in match) == False):
 				match.extend(val)
 				
-				#print(len(val),len(match))
+				#log(len(val),len(match))
 				
 
 
@@ -408,7 +408,7 @@ def is_match_barcodes_hist(sec_dict, barcode_id, re, fuzziness, match):
 def new_SINES_filter_proc(q, main_dict, key_size, fuzziness):
     while True:
         recs = q.get()
-        # print (rec)
+        # log(rec)
 
         if recs is None:
             q.put(None)
@@ -427,7 +427,7 @@ def new_SINES_filter_proc(q, main_dict, key_size, fuzziness):
 
             q.put((rec, match))
     
-    print("Slave process exited")
+    log("Slave process exited")
 	
 	
 # the same as the previous function,
@@ -435,7 +435,7 @@ def new_SINES_filter_proc(q, main_dict, key_size, fuzziness):
 def new_SINES_filter_proc_histogram(q, main_dict, key_size, fuzziness):
     while True:
         recs = q.get()
-        # print (rec)
+        # log(rec)
 
         if recs is None:
             q.put(None)
@@ -454,7 +454,7 @@ def new_SINES_filter_proc_histogram(q, main_dict, key_size, fuzziness):
 
             q.put((rec, match))
     
-    print("Slave process exited")	
+    log("Slave process exited")	
 
 
 def new_SINES_filter_write(q, handle_write_inherited, handle_write_new, wait_none=False):
@@ -672,7 +672,7 @@ def SINES_histogram_of_neighbors(in_file_dict, in_file_initial_filtering, distri
 
 #activate the last lines to create a graph
 def print_histogram(distribution_of_neighbors):
-	print(distribution_of_neighbors)
+	log(distribution_of_neighbors)
 	#indices = np.arange(len(distribution_of_neighbors))
 	#plt.bar(indices, distribution_of_neighbors)
 	

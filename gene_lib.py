@@ -11,9 +11,13 @@ import multiprocessing
 USE_BIO = False
 BIO_TYPE = 'fastq'
 
-# Print a line of text that begins with a time stamp
+def log(*args, **kwargs):
+    """Like print() but to stderr.  Want to keep stdout clean for streaming."""
+    print(*args, **kwargs, file=sys.stderr)
+
 def print_step(line=''):
-    print ("[%s] %s" % (str(datetime.now())[:19], line))
+    """Print a line of text that begins with a time stamp."""
+    log("[%s] %s" % (str(datetime.now())[:19], line))
 
 
 # Get filename base and extenstion

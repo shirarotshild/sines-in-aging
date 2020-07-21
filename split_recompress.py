@@ -20,23 +20,23 @@ def split_recompress(in_fname, out_basename, skip=[]):
         for i, chunk in enumerate(chunks(in_fastq, 100_000_000)):
             out_fname = f'{out_basename}.part{i}e8.fastq.gz'
             if i in skip:
-                print('Skipping', out_fname, file=sys.stderr)
+                log('Skipping', out_fname)
                 max(chunk)  # consume iterator
                 continue
 
-            print('Writing', out_fname, file=sys.stderr)
+            log('Writing', out_fname)
             t0 = time.time()
             with gzip.open(out_fname + '.tmp', 'wb', compresslevel=2) as out_fastq_gz:
             #with open(out_fname, 'wb') as out_fastq_gz:
                 out_fastq_gz.writelines(chunk)
             t1 = time.time()
             os.rename(out_fname + '.tmp', out_fname)
-            print(t1 - t0, 'sec.', file=sys.stderr)
+            log(t1 - t0, 'sec.')
 
 #split_recompress('Old-lung/old_lung_R1_001.fastq.gz', 'Old-lung/old_lung_R1_001')
 
 if __name__ == '__main__':
     [in_fname, out_basename] = sys.argv[1:]
     split_recompress(in_fname, out_basename)
-    print('REMOVING', in_fname)
+    log('REMOVING', in_fname)
     os.remove(in_fname)  # may fail for /dev/stdin, /dev/fd/... etc. but that's OK
