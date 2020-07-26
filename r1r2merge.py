@@ -7,7 +7,6 @@ import sines_io
 import gene_lib
 from gene_lib import log
 from sines_io import fastq_zst_records
-from Bio.SeqRecord import SeqRecord
 import math
 from math import ceil
 
@@ -18,6 +17,7 @@ import Bio
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
+from Bio.SeqRecord import SeqRecord
 
 #current file generated with 15, 4
 common_req = 20

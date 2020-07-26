@@ -1,12 +1,17 @@
 import gzip
 import bz2
 from datetime import datetime
-from Bio import SeqIO
 import sys, os
 import itertools
 from multiprocessing import connection, Lock
 import pickle
 import multiprocessing
+
+# http://biopython.org/
+import Bio
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.Alphabet import IUPAC
 
 USE_BIO = False
 BIO_TYPE = 'fastq'
@@ -231,3 +236,10 @@ class GeneDQueue(object):
         obj = pickle.dumps(obj)
         self._my_pipe.send_bytes(obj)
 
+# this function gets sine fasta file and extracts from it the sine sequence only.
+def get_sine_forward(sine_fname):
+    """Only in direction given in file."""
+    [sine_record] = SeqIO.parse(sine_fname, "fasta", alphabet=IUPAC.IUPACAmbiguousDNA())
+    # TODO: If we return it as dumb string, why did we bother about the alphabet?
+    # TODO: The reference SINEs do contain a couple ambiguous chars - N, Y. 
+    return str(sine_record.seq)

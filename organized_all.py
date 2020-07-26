@@ -1,16 +1,19 @@
-from Bio import SeqIO
 import gzip
-from Bio import Align
-from Bio import pairwise2
 import io
 import gzip
 import shutil
 import tre
+from itertools import product, repeat
+from multiprocessing import Process
+
+from Bio import SeqIO
+from Bio import Align
+from Bio import pairwise2
 from Bio.Seq import Seq
 #from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
-from itertools import product, repeat
-from multiprocessing import Process
+
+import gene_lib
 
 #to save agraph photo
 #from matplotlib import pyplot as plt 
@@ -50,13 +53,6 @@ def txt_to_gzip(in_txt, out_gzip):
 
 ############## part 1 ##############
 
-# this function gets sine fasta file and extracts from it the sine sequence only.
-def get_sines_forward(sine_fname):
-    """Only in direction given in file."""
-    for sine_record in SeqIO.parse(sine_fname, "fasta"):
-        cur_seq = Seq(str(sine_record.seq), IUPAC.IUPACAmbiguousDNA())
-        yield str(cur_seq)
-
 def filter_potential_sines_and_locations_proc(q, re, fuzziness):
     while True:
         recs = q.get()
@@ -90,7 +86,7 @@ def filter_potential_sines_and_locations_write(q, handle_write_sine, handle_writ
 # and create a new fastq file with all the records contains the sine,
 # and another file contains the sines locations (tuple of (sine_start, sine_end) for each sine)
 def filter_potential_sines_and_locations(in_file_unify, in_file_sine, out_file_with_sine, out_file_location, sine_header=67, maxerr=14):
-    [sine] = get_sines_forward(in_file_sine) #[B1] #"B1.fasta"
+    sine = gene_lib.get_sine_forward(in_file_sine)  #"B1.fasta"
     re = tre.compile(sine[:sine_header], tre.EXTENDED)
     fuzziness = tre.Fuzzyness(maxerr=maxerr)
 
@@ -171,7 +167,7 @@ def filter_potential_sines_and_locations(in_file_unify, in_file_sine, out_file_w
 
 
 # def filter_potential_sines_and_locations(in_file_unify, in_file_sine, out_file_with_sine, out_file_location, sine_header=67, maxerr=14):
-#     [sine] = get_sines_forward(in_file_sine) #[B1] #"B1.fasta"
+#     sine = gene_lib.get_sine_forward(in_file_sine) #"B1.fasta"
 #     re = tre.compile(sine[:sine_header], tre.EXTENDED)
 #     fuzziness = tre.Fuzzyness(maxerr=maxerr)
 #     with open_any(in_file_unify, "rt") as handle_read:
