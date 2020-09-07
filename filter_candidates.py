@@ -28,7 +28,7 @@ def filter_potential_sines(in_fname, sine_string, sine_header=67, maxerr=19):
             if match:
                 # log(rec.seq)
                 #sine_location = match.groups() #returns tuple of tuples (in this case: ((2,78), ) for example
-                SeqIO.write(rec, sys.stdout, 'fasta')
+                SeqIO.write(rec, sys.stdout, 'fastq')
 
 # Writes to stdout, uncompresed
 [sine_fname, merged_input_fname] = sys.argv[1:]
