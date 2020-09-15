@@ -1,27 +1,19 @@
+from Bio import SeqIO
 import gzip
+from Bio import Align
+from Bio import pairwise2
 import io
 
 import shutil
 import tre
-from itertools import product, repeat
-from multiprocessing import Process
-
-from Bio import SeqIO
-from Bio import Align
-from Bio import pairwise2
 from Bio.Seq import Seq
 #from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
-<<<<<<< HEAD
 from itertools import product, repeat
 from multiprocessing import Process
 import gene_lib
 import Bio
 import queue
-=======
-
-import gene_lib
->>>>>>> 43f3ca09184d4218470cf7f545d6841e1e2ec1ad
 
 
 try:
@@ -36,10 +28,10 @@ from tqdm import tqdm
 import os
 from gene_lib import *
 
-#log(open_any("/media/sf_gene/original/B1.fasta", "rt"))
-#log(open_any("/media/sf_gene/original/wt-lung_R1_001.fastq.gz", "rt"))
-#log(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2", "r"))
-#log(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2.blabla", "rt"))
+#print(open_any("/media/sf_gene/original/B1.fasta", "rt"))
+#print(open_any("/media/sf_gene/original/wt-lung_R1_001.fastq.gz", "rt"))
+#print(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2", "r"))
+#print(open_any("/media/sf_gene/unified/wt-lung_unified_001.fastq.bz2.blabla", "rt"))
 
 
 #sys.exit()
@@ -58,10 +50,17 @@ def txt_to_gzip(in_txt, out_gzip):
 
 ############## part 1 ##############
 
+# this function gets sine fasta file and extracts from it the sine sequence only.
+def get_sines_forward(sine_fname):
+    """Only in direction given in file."""
+    for sine_record in SeqIO.parse(sine_fname, "fasta"):
+        cur_seq = Seq(str(sine_record.seq), IUPAC.IUPACAmbiguousDNA())
+        yield str(cur_seq)
+
 def filter_potential_sines_and_locations_proc(q, re, fuzziness):
     while True:
         recs = q.get()
-        # log(rec)
+        # print (rec)
 
         if recs is None:
             break
@@ -69,7 +68,7 @@ def filter_potential_sines_and_locations_proc(q, re, fuzziness):
         for rec in recs:
             match = re.search(str(rec.seq), fuzziness)
             if match:
-                # log(rec.seq)
+                # print(rec.seq)
                 sine_location = match.groups() #returns tuple of tuples (in this case: ((2,78), ) for example
 
                 q.put((rec, sine_location))
@@ -91,7 +90,7 @@ def filter_potential_sines_and_locations_write(q, handle_write_sine, handle_writ
 # and create a new fastq file with all the records contains the sine,
 # and another file contains the sines locations (tuple of (sine_start, sine_end) for each sine)
 def filter_potential_sines_and_locations(in_file_unify, in_file_sine, out_file_with_sine, out_file_location, sine_header=67, maxerr=14):
-    sine = gene_lib.get_sine_forward(in_file_sine)  #"B1.fasta"
+    [sine] = get_sines_forward(in_file_sine) #[B1] #"B1.fasta"
     re = tre.compile(sine[:sine_header], tre.EXTENDED)
     fuzziness = tre.Fuzzyness(maxerr=maxerr)
 
@@ -172,7 +171,7 @@ def filter_potential_sines_and_locations(in_file_unify, in_file_sine, out_file_w
 
 
 # def filter_potential_sines_and_locations(in_file_unify, in_file_sine, out_file_with_sine, out_file_location, sine_header=67, maxerr=14):
-#     sine = gene_lib.get_sine_forward(in_file_sine) #"B1.fasta"
+#     [sine] = get_sines_forward(in_file_sine) #[B1] #"B1.fasta"
 #     re = tre.compile(sine[:sine_header], tre.EXTENDED)
 #     fuzziness = tre.Fuzzyness(maxerr=maxerr)
 #     with open_any(in_file_unify, "rt") as handle_read:
@@ -294,9 +293,9 @@ def build_dictionary(in_file_prefix, out_file_dict, sine_barcode_len = 36, maxer
 
     print_step("Start build_dictionary: product of 'ATCGN'")
     for tuple in tqdm(product('ATCGN', repeat=main_key_len)): #product returns iterator
-        #log(tuple)
+        #print(tuple)
         main_key = "".join([str(x) for x in tuple]) #without str() ??
-        #log(main_key)
+        #print(main_key)
         main_dict[main_key] = {}
     
     print_step("Start build_dictionary: fill with records")
@@ -333,9 +332,9 @@ def build_dictionary_for_histogram(in_file_prefix, out_file_dict, sine_barcode_l
 
 	print_step("Start build_dictionary: product of 'ATCGN'")
 	for tuple in tqdm(product('ATCGN', repeat=main_key_len)): #product returns iterator
-		#log(tuple)
+		#print(tuple)
 		main_key = "".join([str(x) for x in tuple]) #without str() ??
-		#log(main_key)
+		#print(main_key)
 		main_dict[main_key] = {}
 
 	print_step("Start build_dictionary: fill with records")
@@ -391,7 +390,7 @@ def is_match_barcodes_hist(sec_dict, barcode_id, re, fuzziness, match, lenght):
 			if ((val[0] in match) == False):
 				match.extend(val)
 				
-				#log(len(val),len(match))
+				#print(len(val),len(match))
 				
 
 
@@ -410,7 +409,7 @@ def is_match_barcodes_hist(sec_dict, barcode_id, re, fuzziness, match, lenght):
 def new_SINES_filter_proc(q, main_dict, key_size, fuzziness):
     while True:
         recs = q.get()
-        # log(rec)
+        # print (rec)
 
         if recs is None:
             q.put(None)
@@ -429,40 +428,14 @@ def new_SINES_filter_proc(q, main_dict, key_size, fuzziness):
 
             q.put((rec, match))
     
-    log("Slave process exited")
+    print("Slave process exited")
 	
 	
 # the same as the previous function,
 # only here the match is a list of all the barcodes id that close to the barcode
-<<<<<<< HEAD
 def new_SINES_filter_proc_histogram(recs, main_dict, noDuplicate, key_size, fuzziness, distribution_of_neighbors, lenght):
 	
 	with open_any(noDuplicate, "wt") as handle_noDuplicate:
-=======
-def new_SINES_filter_proc_histogram(q, main_dict, key_size, fuzziness):
-    while True:
-        recs = q.get()
-        # log(rec)
-
-        if recs is None:
-            q.put(None)
-            break
-
-        for rec in recs:
-            str_barc = str(rec.seq)
-            re = tre.compile(str_barc, tre.EXTENDED)
-            barc_parts_list = barcode_parts(rec, key_size)
-            match = []
-            
-            for rec_part in barc_parts_list:
-                is_match_barcodes_hist(main_dict[str(rec_part.seq)], rec.id, re, fuzziness, match)
-                    
-                    
-
-            q.put((rec, match))
-    
-    log("Slave process exited")	
->>>>>>> 43f3ca09184d4218470cf7f545d6841e1e2ec1ad
 
 		count = 0
 		for rec in recs:
@@ -651,7 +624,6 @@ def SINES_histogram_of_neighbors(in_file_dict, in_file_initial_filtering,noDupli
 	new_SINES_filter_for_histogram(in_file_initial_filtering, dict, noDuplicate, distribution_of_neighbors,lenght)
 
 #activate the last lines to create a graph
-<<<<<<< HEAD
 def print_histogram(distribution_of_neighbors, name, lenght, mode = 5):
 	
 	if mode == 5:
@@ -682,12 +654,6 @@ def print_histogram(distribution_of_neighbors, name, lenght, mode = 5):
 	print("percetage:", percetage)
 	print("normal all: ", normal1)
 	print("normal -1: ", normal2)
-=======
-def print_histogram(distribution_of_neighbors):
-	log(distribution_of_neighbors)
-	#indices = np.arange(len(distribution_of_neighbors))
-	#plt.bar(indices, distribution_of_neighbors)
->>>>>>> 43f3ca09184d4218470cf7f545d6841e1e2ec1ad
 	
 	
 
